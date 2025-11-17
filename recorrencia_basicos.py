@@ -2,6 +2,48 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any
 
+def carregar_bases():
+    base_dir = Path(__file__).parent
+    df_erp = pd.read_excel(
+        base_dir / "total_indicadores.xlsx",
+        sheet_name="Planilha1",
+        dtype={"INSUMO_CDG": "string", "FORNECEDOR_CDG": "string"},
+    )
+
+    # Datas
+    df_erp["REQ_DATA"] = pd.to_datetime(df_erp["REQ_DATA"], errors="coerce")
+    df_erp["OF_DATA"] = pd.to_datetime(df_erp["OF_DATA"], errors="coerce")
+
+    # Numéricos
+    for col in ["PRCTTL_INSUMO", "ITEM_PRCUNTPED", "TOTAL"]:
+        if col in df_erp.columns:
+            df_erp[col] = pd.to_numeric(df_erp[col], errors="coerce")
+
+    # Preservar zeros no código do fornecedor
+    if "FORNECEDOR_CDG" in df_erp.columns:
+        df_erp["FORNECEDOR_CDG"] = df_erp["FORNECEDOR_CDG"].astype("string")
+        w = int(df_erp["FORNECEDOR_CDG"].dropna().astype(str).str.len().max())
+        if w > 0:
+            df_erp["FORNECEDOR_CDG"] = df_erp["FORNECEDOR_CDG"].str.zfill(w)
+
+    # Classificação de básicos
+    df_bas = pd.read_excel(
+        base_dir / "MateriaisBasicos.xlsx",
+        sheet_name="Final",
+        usecols=["Código"],
+        dtype={"Código": "string"},
+    ).drop_duplicates()
+
+    cod_basicos = set(df_bas["Código"].dropna())
+    if "TIPO_MATERIAL" not in df_erp.columns:
+        pos = df_erp.columns.get_loc("INSUMO_CDG") + 1
+        df_erp.insert(
+            pos,
+            "TIPO_MATERIAL",
+            np.where(df_erp["INSUMO_CDG"].isin(cod_basicos), "BÁSICO", "ESPECÍFICO"),
+        )
+
+    return df_erp
 
 # ============================================================
 # 1) Função base: filtrar só BÁSICOS em um ano
@@ -507,4 +549,5 @@ def painel_recorrencia_basicos(
         "intervalo_medio_entre_pedidos": df_intervalos,
         "itens_pequena_qtd_alta_freq": df_pingados,
         "resumo_indicadores": resumo,
+
     }
