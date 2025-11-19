@@ -1,8 +1,5 @@
 streamlit
 pandas
-selenium
-webdriver_manager
-pyautogui
-pyperclip
-openpyxl
-python-dotenv
+numpy
+matplotlib
+seaborn
