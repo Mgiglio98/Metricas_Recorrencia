@@ -37,19 +37,31 @@ def plot_top_itens_recorrencia_mensal(df_mes: pd.DataFrame, top_n: int = 15):
     """
     df_mes: saída de basicos_reqs_mes
       EMPRD | EMPRD_DESC | ANO_MES | INSUMO_CDG | INSUMO_DESC | QTD_REQS_MES
+
+    Correção:
+    - Deduplicação por (EMPRD, REQ_CDG, INSUMO_CDG, ANO_MES)
+    - Soma consistente da recorrência mensal
     """
     set_osborne_style()
     fig, ax = plt.subplots()
 
     if df_mes is None or df_mes.empty:
-        ax.text(0.5, 0.5, "Sem dados de recorrência mensal.",
-                ha="center", va="center", fontsize=11)
+        ax.text(
+            0.5, 0.5, 
+            "Sem dados de recorrência mensal.",
+            ha="center", va="center", fontsize=11
+        )
         ax.axis("off")
         return fig
 
-    # Soma recorrência por item (independente de obra/mês)
+    # Deduplicar combinações dentro do mês
+    df_clean = df_mes.drop_duplicates(
+        subset=["EMPRD", "REQ_CDG", "INSUMO_CDG", "ANO_MES"]
+    )
+
+    # Soma real da recorrência mensal
     agg = (
-        df_mes.groupby(["INSUMO_CDG", "INSUMO_DESC"])["QTD_REQS_MES"]
+        df_clean.groupby(["INSUMO_CDG", "INSUMO_DESC"])["QTD_REQS_MES"]
         .sum()
         .reset_index()
         .sort_values("QTD_REQS_MES", ascending=False)
@@ -57,24 +69,28 @@ def plot_top_itens_recorrencia_mensal(df_mes: pd.DataFrame, top_n: int = 15):
     )
 
     if agg.empty:
-        ax.text(0.5, 0.5, "Nenhum item com recorrência mensal atingindo o critério.",
-                ha="center", va="center", fontsize=11)
+        ax.text(
+            0.5, 0.5,
+            "Nenhum item com recorrência mensal atingindo o critério.",
+            ha="center", va="center", fontsize=11
+        )
         ax.axis("off")
         return fig
 
-    agg = agg.sort_values("QTD_REQS_MES", ascending=True)  # para barra horizontal
+    # Ordenar em ordem crescente para barra horizontal
+    agg = agg.sort_values("QTD_REQS_MES", ascending=True)
 
     ax.barh(agg["INSUMO_DESC"], agg["QTD_REQS_MES"], color=OSBORNE_ORANGE)
-    ax.set_xlabel("Quantidade de REQs com o item (mês)")
+    ax.set_xlabel("Quantidade de REQs distintas com o item (mensal)")
     ax.set_ylabel("Item básico")
-    ax.set_title("Top itens básicos por recorrência mensal (soma geral)")
+    ax.set_title("Top itens básicos por recorrência mensal (ajustado)")
 
+    # Labels
     for i, v in enumerate(agg["QTD_REQS_MES"]):
         ax.text(v + 0.2, i, str(int(v)), va="center", fontsize=9)
 
     fig.tight_layout()
     return fig
-
 
 def plot_recorrencia_mensal_por_obra(df_mes: pd.DataFrame, obra: str | int):
     """
@@ -308,4 +324,5 @@ def plot_itens_pingados(df_pingados: pd.DataFrame, top_n: int = 15):
         ax.text(n_ped + 0.1, i, f"{int(n_ped)} REQs | média {m_qtd:.2f}", va="center", fontsize=8)
 
     fig.tight_layout()
+
     return fig
