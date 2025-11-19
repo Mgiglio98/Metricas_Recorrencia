@@ -5,11 +5,13 @@ import os
 from pathlib import Path
 
 def get_base_dir():
-    # Funciona em qualquer ambiente
+    # LOCAL (VSCode) → usa __file__
     if "__file__" in globals():
         return Path(__file__).resolve().parent
-    else:
-        return Path(os.getcwd()).resolve()
+
+    # STREAMLIT CLOUD → usa o diretório onde o app está sendo executado
+    return Path(os.getcwd()).resolve()
+
 
 def carregar_bases():
     base_dir = get_base_dir()
@@ -560,5 +562,6 @@ def painel_recorrencia_basicos(
         "resumo_indicadores": resumo,
 
     }
+
 
 
