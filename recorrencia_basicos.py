@@ -12,7 +12,7 @@ def get_base_dir():
         return Path(os.getcwd()).resolve()
 
 def carregar_bases():
-    base_dir = Path(__file__).parent
+    base_dir = get_base_dir()
     df_erp = pd.read_excel(
         base_dir / "total_indicadores.xlsx",
         sheet_name="Planilha1",
@@ -560,4 +560,5 @@ def painel_recorrencia_basicos(
         "resumo_indicadores": resumo,
 
     }
+
 
