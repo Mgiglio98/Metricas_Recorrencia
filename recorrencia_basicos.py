@@ -1,6 +1,15 @@
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any
+import os
+from pathlib import Path
+
+def get_base_dir():
+    # Funciona em qualquer ambiente
+    if "__file__" in globals():
+        return Path(__file__).resolve().parent
+    else:
+        return Path(os.getcwd()).resolve()
 
 def carregar_bases():
     base_dir = Path(__file__).parent
@@ -551,3 +560,4 @@ def painel_recorrencia_basicos(
         "resumo_indicadores": resumo,
 
     }
+
