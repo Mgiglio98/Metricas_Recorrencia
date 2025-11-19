@@ -181,15 +181,18 @@ def basicos_reqs_subsequentes(
     min_ligacoes: int = 1
 ) -> pd.DataFrame:
     """
-    Identifica itens básicos que aparecem em REQ consecutivas de uma mesma obra.
+    Identifica itens básicos que aparecem em REQs consecutivas de uma mesma obra.
 
     Por obra e insumo, calcula:
       - TOTAL_REQS_ITEM: quantas REQs tiveram o item
-      - N_LIGACOES_SUBSEQ: quantas "ligações" de REQ consecutivas (REQ n e n+1)
-      - MAX_SEQ_SUBSEQ: maior sequência contínua de REQs contendo o item
+      - N_LIGACOES_SUBSEQ: quantas ligações REQ(n) -> REQ(n+1)
+      - MAX_SEQ_SUBSEQ: maior sequência contínua de REQs consecutivas contendo o item
 
-    Retorna apenas casos com N_LIGACOES_SUBSEQ >= min_ligacoes.
+    ⚠️ Correção importante:
+      Agora a ordem das requisições é baseada SOMENTE no REQ_CDG,
+      que é a ordem real do ERP. Datas não são usadas para ordenar.
     """
+
     base = _filtrar_basicos_ano(df, ano)
     if base.empty or "REQ_CDG" not in base.columns or "EMPRD" not in base.columns:
         return pd.DataFrame(columns=[
@@ -197,46 +200,58 @@ def basicos_reqs_subsequentes(
             "TOTAL_REQS_ITEM", "N_LIGACOES_SUBSEQ", "MAX_SEQ_SUBSEQ"
         ])
 
-    base["REQ_DATA_DT"] = pd.to_datetime(base["REQ_DATA"], errors="coerce")
-    base = base.dropna(subset=["REQ_DATA_DT", "EMPRD", "REQ_CDG", "INSUMO_CDG"])
+    # Garantir que REQ_CDG seja numérico para ordenar corretamente
+    base["REQ_CDG"] = pd.to_numeric(base["REQ_CDG"], errors="coerce")
+    base = base.dropna(subset=["REQ_CDG", "EMPRD", "INSUMO_CDG"])
 
-    # Mapa de ordem das REQs por obra
+    # Mapa de ordem das REQs por obra usando SOMENTE o REQ_CDG
     reqs = (
-        base[["EMPRD", "REQ_CDG", "REQ_DATA_DT"]]
+        base[["EMPRD", "REQ_CDG"]]
         .drop_duplicates()
-        .sort_values(["EMPRD", "REQ_DATA_DT", "REQ_CDG"])
+        .sort_values(["EMPRD", "REQ_CDG"])            # 👈 CORREÇÃO PRINCIPAL
     )
+
     reqs["ORD_REQ_OBRA"] = reqs.groupby("EMPRD").cumcount()
 
-    base = base.merge(reqs[["EMPRD", "REQ_CDG", "ORD_REQ_OBRA"]], on=["EMPRD", "REQ_CDG"], how="left")
+    # Junta de volta na base
+    base = base.merge(
+        reqs[["EMPRD", "REQ_CDG", "ORD_REQ_OBRA"]],
+        on=["EMPRD", "REQ_CDG"],
+        how="left"
+    )
 
     nomes_empr = _mapa_empr_desc(base)
     nomes_insumo = _mapa_insumo_desc(base)
 
     resultados = []
 
+    # Avaliar item por item dentro de cada obra
     for (emprd, ins_cdg), g in base.groupby(["EMPRD", "INSUMO_CDG"]):
+
+        # Pega apenas os códigos de ordem da obra, 1 por REQ
         ords = (
             g[["ORD_REQ_OBRA"]]
-            .dropna()
             .drop_duplicates()
             .sort_values("ORD_REQ_OBRA")["ORD_REQ_OBRA"]
             .to_numpy()
         )
-        if len(ords) < 2:
+
+        total_reqs = len(ords)
+        if total_reqs < 2:
             continue
 
         diffs = np.diff(ords)
+
+        # quantas vezes houve proximidade 1
         n_links = int((diffs == 1).sum())
 
-        # maior sequência contínua de REQs consecutivas
+        # maior sequência contínua
         max_seq = 1
         atual = 1
         for d in diffs:
             if d == 1:
                 atual += 1
-                if atual > max_seq:
-                    max_seq = atual
+                max_seq = max(max_seq, atual)
             else:
                 atual = 1
 
@@ -244,7 +259,7 @@ def basicos_reqs_subsequentes(
             resultados.append({
                 "EMPRD": emprd,
                 "INSUMO_CDG": ins_cdg,
-                "TOTAL_REQS_ITEM": int(len(ords)),
+                "TOTAL_REQS_ITEM": int(total_reqs),
                 "N_LIGACOES_SUBSEQ": int(n_links),
                 "MAX_SEQ_SUBSEQ": int(max_seq),
             })
@@ -265,6 +280,7 @@ def basicos_reqs_subsequentes(
         "EMPRD", "EMPRD_DESC", "INSUMO_CDG", "INSUMO_DESC",
         "TOTAL_REQS_ITEM", "N_LIGACOES_SUBSEQ", "MAX_SEQ_SUBSEQ"
     ]
+
     return out[cols].sort_values(
         ["N_LIGACOES_SUBSEQ", "MAX_SEQ_SUBSEQ", "TOTAL_REQS_ITEM"],
         ascending=[False, False, False]
@@ -562,6 +578,7 @@ def painel_recorrencia_basicos(
         "resumo_indicadores": resumo,
 
     }
+
 
 
 
