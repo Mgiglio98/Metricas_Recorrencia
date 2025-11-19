@@ -116,7 +116,7 @@ def _mapa_insumo_desc(base: pd.DataFrame) -> pd.DataFrame:
 def basicos_reqs_mes(
     df: pd.DataFrame,
     ano: Optional[int] = None,
-    min_reqs_mes: int = 2
+    min_reqs_mes: int = 1
 ) -> pd.DataFrame:
     """
     Itens básicos que aparecem em pelo menos `min_reqs_mes` requisições distintas
@@ -562,6 +562,7 @@ def painel_recorrencia_basicos(
         "resumo_indicadores": resumo,
 
     }
+
 
 
 
